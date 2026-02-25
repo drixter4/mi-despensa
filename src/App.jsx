@@ -69,6 +69,7 @@ const App = () => {
     } catch (err) {
       console.error("No se pudo acceder a la cámara:", err);
       setIsScanning(false);
+      alert("No se pudo acceder a la cámara. Revisa los permisos.");
     }
   };
 
@@ -90,23 +91,38 @@ const App = () => {
     const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`, {
+      // Cambiamos al modelo público de Gemini (gemini-1.5-flash)
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [
-            { text: "Identify the pantry item. Respond ONLY JSON: {\"name\": \"name\", \"category\": \"category\"}" },
+            { text: "Identify the pantry item. Respond ONLY in valid JSON format exactly like this: {\"name\": \"name\", \"category\": \"category\"}" },
             { inlineData: { mimeType: "image/jpeg", data: base64 } }
           ]}]
         })
       });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        throw new Error(`API Error ${response.status}: ${errorData}`);
+      }
+
       const data = await response.json();
+      
+      // Validación extra para evitar fallos si la respuesta no es la esperada
+      if (!data.candidates || !data.candidates[0].content.parts[0].text) {
+        throw new Error("Respuesta inválida de la IA");
+      }
+
       const text = data.candidates[0].content.parts[0].text;
       const result = JSON.parse(text.replace(/```json|```/g, ''));
+      
       await addItem(result.name, result.category);
       stopCamera();
     } catch (err) {
       console.error("Error Gemini:", err);
+      alert("Hubo un error al identificar el producto. Intenta de nuevo.");
     } finally {
       setIsAnalyzing(false);
     }
