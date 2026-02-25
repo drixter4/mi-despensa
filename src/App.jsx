@@ -8,30 +8,20 @@ import {
 } from 'lucide-react';
 import './App.css'
 
-// Función segura para obtener variables de entorno o usar valores por defecto
-const getEnvVar = (key, fallback) => {
-  try {
-    if (typeof import.meta !== 'undefined' && import.meta.env) {
-      return import.meta.env[key] || fallback;
-    }
-  } catch (e) {
-    // Entorno sin import.meta
-  }
-  return fallback;
-};
+
 
 // --- CONFIGURACIÓN DE CLAVES DESDE .ENV ---
 const firebaseConfig = {
-  apiKey: getEnvVar('VITE_FIREBASE_API_KEY', "AIzaSyDSNcbE4zBEPv1Uj13A_vMB9y419dT6w1o"),
-  authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN', "mi-despensa-93fd8.firebaseapp.com"),
-  projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', "mi-despensa-93fd8"),
-  storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET', "mi-despensa-93fd8.firebasestorage.app"),
-  messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID', "696959507024"),
-  appId: getEnvVar('VITE_FIREBASE_APP_ID', "1:696959507024:web:dcfd5960d24b7a9b324f55"),
-  measurementId: getEnvVar('VITE_FIREBASE_MEASUREMENT_ID', "G-Z9M5SB9BJ2")
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-const GEMINI_API_KEY = getEnvVar('VITE_GEMINI_API_KEY', "TU_NUEVA_CLAVE_GEMINI_AQUI");
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
 // Inicializamos Firebase
 const app = initializeApp(firebaseConfig);
