@@ -6,24 +6,39 @@ import {
   Camera, Plus, Trash2, ShoppingCart, Package, 
   Loader2, CheckCircle2, X 
 } from 'lucide-react';
-import './App.css';
+import './App.css'
 
-// --- CONFIGURACIÓN DE CLAVES ---
-const firebaseConfig = {
-  apiKey: "AIzaSyDSNcbE4zBEPv1Uj13A_vMB9y419dT6w1o",
-  authDomain: "mi-despensa-93fd8.firebaseapp.com",
-  projectId: "mi-despensa-93fd8",
-  storageBucket: "mi-despensa-93fd8.firebasestorage.app",
-  messagingSenderId: "696959507024",
-  appId: "1:696959507024:web:dcfd5960d24b7a9b324f55",
-  measurementId: "G-Z9M5SB9BJ2"
+// Función segura para obtener variables de entorno o usar valores por defecto
+const getEnvVar = (key, fallback) => {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      return import.meta.env[key] || fallback;
+    }
+  } catch (e) {
+    // Entorno sin import.meta
+  }
+  return fallback;
 };
 
-const GEMINI_API_KEY = "AIzaSyDB2lVtlhw_le0YLfgAtGKentshkrI8aHY";
+// --- CONFIGURACIÓN DE CLAVES DESDE .ENV ---
+const firebaseConfig = {
+  apiKey: getEnvVar('VITE_FIREBASE_API_KEY', "AIzaSyDSNcbE4zBEPv1Uj13A_vMB9y419dT6w1o"),
+  authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN', "mi-despensa-93fd8.firebaseapp.com"),
+  projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID', "mi-despensa-93fd8"),
+  storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET', "mi-despensa-93fd8.firebasestorage.app"),
+  messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID', "696959507024"),
+  appId: getEnvVar('VITE_FIREBASE_APP_ID', "1:696959507024:web:dcfd5960d24b7a9b324f55"),
+  measurementId: getEnvVar('VITE_FIREBASE_MEASUREMENT_ID', "G-Z9M5SB9BJ2")
+};
 
+const GEMINI_API_KEY = getEnvVar('VITE_GEMINI_API_KEY', "TU_NUEVA_CLAVE_GEMINI_AQUI");
+
+// Inicializamos Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// --- ESTILOS INTEGRADOS ---
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -40,7 +55,13 @@ const App = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) await signInAnonymously(auth);
+      if (!currentUser) {
+        try {
+          await signInAnonymously(auth);
+        } catch (error) {
+          console.error("Error en autenticación anónima:", error);
+        }
+      }
       setUser(currentUser);
     });
     return () => unsubscribe();
@@ -74,7 +95,7 @@ const App = () => {
   };
 
   const stopCamera = () => {
-    if (videoRef.current?.srcObject) {
+    if (videoRef.current && videoRef.current.srcObject) {
       videoRef.current.srcObject.getTracks().forEach(track => track.stop());
     }
     setIsScanning(false);
@@ -82,6 +103,12 @@ const App = () => {
 
   const captureAndIdentify = async () => {
     if (!videoRef.current || isAnalyzing) return;
+    
+    if (!GEMINI_API_KEY || GEMINI_API_KEY === "TU_NUEVA_CLAVE_GEMINI_AQUI") {
+      alert("Por favor, configura tu API Key de Gemini en el archivo .env");
+      return;
+    }
+
     setIsAnalyzing(true);
 
     const canvas = canvasRef.current;
@@ -91,28 +118,36 @@ const App = () => {
     const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
 
     try {
-      // Cambiamos al modelo público de Gemini (gemini-1.5-flash)
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [
-            { text: "Identify the pantry item. Respond ONLY in valid JSON format exactly like this: {\"name\": \"name\", \"category\": \"category\"}" },
-            { inlineData: { mimeType: "image/jpeg", data: base64 } }
-          ]}]
-        })
-      });
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+      let data = null;
+      let lastError = null;
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`API Error ${response.status}: ${errorData}`);
+      for (const model of modelsToTry) {
+        try {
+          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [
+                { text: "Identify the pantry item in Spanish. Respond ONLY in valid JSON format exactly like this: {\"name\": \"name\", \"category\": \"category\"}" },
+                { inlineData: { mimeType: "image/jpeg", data: base64 } }
+              ]}]
+            })
+          });
+
+          if (response.ok) {
+            data = await response.json();
+            break; // Si tiene éxito, salimos del bucle
+          } else {
+            lastError = await response.text();
+          }
+        } catch (e) {
+          lastError = e.message;
+        }
       }
 
-      const data = await response.json();
-      
-      // Validación extra para evitar fallos si la respuesta no es la esperada
-      if (!data.candidates || !data.candidates[0].content.parts[0].text) {
-        throw new Error("Respuesta inválida de la IA");
+      if (!data || !data.candidates || !data.candidates[0].content.parts[0].text) {
+        throw new Error(`Todos los modelos fallaron. Último error: ${lastError}`);
       }
 
       const text = data.candidates[0].content.parts[0].text;
@@ -147,12 +182,18 @@ const App = () => {
     await deleteDoc(doc(db, 'pantry', id));
   };
 
-  if (loading) return <div className="loading-state" style={{display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafc'}}>Conectando...</div>;
+  if (loading) return (
+    <div style={{display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#f8fafc', fontFamily: 'sans-serif', color: '#64748b'}}>
+      <Loader2 className="animate-spin" style={{marginBottom: '10px'}} size={32} color="#4f46e5" />
+      <p>Cargando despensa...</p>
+    </div>
+  );
 
   const filteredItems = items.filter(i => activeTab === 'inventory' ? i.inStock : !i.inStock);
 
   return (
     <div className="app-container">
+      
       <header className="app-header">
         <div className="brand">
           <div className="brand-icon"><Package size={20}/></div>
@@ -217,7 +258,7 @@ const App = () => {
           <div className="camera-controls">
             <button className="close-camera" onClick={stopCamera}><X /></button>
             <button className="capture-btn" onClick={captureAndIdentify} disabled={isAnalyzing}>
-              {isAnalyzing && <Loader2 className="animate-spin" color="#4f46e5" />}
+              {isAnalyzing && <Loader2 className="animate-spin" color="#4f46e5" size={32} />}
             </button>
             <div style={{width: 50}}></div>
           </div>
@@ -237,6 +278,13 @@ const App = () => {
                 placeholder="Ej. Arroz" 
                 value={manualName}
                 onChange={(e) => setManualName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && manualName) {
+                    addItem(manualName);
+                    setManualName('');
+                    setShowManual(false);
+                  }
+                }}
               />
             </div>
             <div style={{display:'flex', gap: 10}}>
