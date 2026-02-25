@@ -16,12 +16,21 @@ import {
 } from 'lucide-react';
 
 // --- Configuración de Firebase y Variables Globales ---
-const firebaseConfig = JSON.parse(__firebase_config);
+const firebaseConfig = {
+  apiKey: "AIzaSyDSNcbE4zBEPv1Uj13A_vMB9y419dT6w1o",
+  authDomain: "mi-despensa-93fd8.firebaseapp.com",
+  projectId: "mi-despensa-93fd8",
+  storageBucket: "mi-despensa-93fd8.firebasestorage.app",
+  messagingSenderId: "696959507024",
+  appId: "1:696959507024:web:dcfd5960d24b7a9b324f55",
+  measurementId: "G-Z9M5SB9BJ2"
+};
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'pantry-manager-123';
-const apiKey = ""; // La plataforma proporciona la clave en el entorno de ejecución
+const apiKey = "AIzaSyDB2lVtlhw_le0YLfgAtGKentshkrI8aHY"; // La plataforma proporciona la clave en el entorno de ejecución
 
 const App = () => {
   const [user, setUser] = useState(null);
